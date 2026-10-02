@@ -1,0 +1,8 @@
+{
+  "name": "xyz-collection-inventory",
+  "version": "1.0.0",
+  "description": "XYZ Collection inventory & sales tracker (Node.js + SQLite, no dependencies)",
+  "main": "server.js",
+  "scripts": { "start": "node --no-warnings server.js" },
+  "engines": { "node": ">=22.13" }
+}

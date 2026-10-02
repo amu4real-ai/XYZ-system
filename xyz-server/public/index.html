@@ -1,0 +1,192 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>XYZ Collection · Inventory</title>
+<style>
+:root{--bg:#faf7f5;--c:#fff;--t:#2a2326;--m:#7a6f74;--a:#b83a6b;--b:#e8dfe3;--ok:#1f8a5b;--w:#c77a00;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1719;--c:#262022;--t:#f1eaed;--m:#a99da3;--b:#3a3236;--a:#e2679a;--ok:#4cc38a;--w:#f0a63a}}
+:root[data-theme="dark"]{--bg:#1b1719;--c:#262022;--t:#f1eaed;--m:#a99da3;--b:#3a3236;--a:#e2679a;--ok:#4cc38a;--w:#f0a63a}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--t);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--c);border-bottom:1px solid var(--b);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+h1{font-size:17px;margin:0;color:var(--a)}h3{margin:0 0 10px}main{flex:1;min-width:0;max-width:1100px;padding:14px}
+#wrap{display:flex;align-items:stretch;min-height:calc(100vh - 56px)}
+nav{flex:0 0 200px;display:flex;flex-direction:column;gap:4px;padding:12px 8px;background:var(--a)}nav:empty{display:none}
+nav button{white-space:nowrap;width:100%;text-align:left;background:transparent;color:#fff;border:0;padding:10px 12px;opacity:.9}
+nav button:hover{background:#ffffff26}nav .on{background:#ffffff3d;font-weight:700;opacity:1}
+@media(max-width:700px){#wrap{flex-direction:column}nav{flex:none;flex-direction:row;overflow-x:auto;padding:8px}nav button{width:auto}}
+button,select,input{font:inherit;color:var(--t);background:var(--c);border:1px solid var(--b);border-radius:8px;padding:7px 11px}
+button{cursor:pointer}button.p{background:var(--a);color:#fff;border-color:var(--a)}button.s{padding:4px 8px;font-size:13px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:14px;margin-bottom:12px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.k b{display:block;font-size:20px}.k span,.m{color:var(--m);font-size:13px}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--b);white-space:nowrap}th{color:var(--m);font-weight:600}
+.al{border-left:4px solid var(--w)}.tag{font-size:11px;padding:2px 7px;border-radius:99px;background:var(--b)}.ok{color:var(--ok)}
+img.t{width:36px;height:36px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-right:6px;background:var(--b)}
+.mb{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:14px;z-index:9}.mb .card{width:100%;max-width:420px;max-height:90%;overflow:auto;margin:0}
+label{display:block;margin-bottom:9px;font-size:13px;color:var(--m)}label input,label select{display:block;width:100%;margin-top:3px;color:var(--t)}.r{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.er{color:#d33;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+.sw{width:24px;height:24px;padding:0;border-radius:50%;border:2px solid var(--c);box-shadow:0 0 0 1px var(--b)}#pal{display:flex;gap:7px;align-items:center}
+</style></head><body>
+<header><h1>XYZ Collection</h1><div id="pal" aria-label="Colour theme"></div><div id="who" class="m"></div></header><div id="wrap"><nav id="nav"></nav><main id="app">Loading…</main></div><div id="m"></div>
+<script>
+const $=s=>document.querySelector(s),N=n=>Number(n||0).toLocaleString(),E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const C={sup:'suppliers',cou:'couriers',ord:'orders',sal:'sales',usr:'users',rep:'reports',aud:'audit'},S={sup:[],cou:[],ord:[],sal:[],usr:[],rep:[],aud:[]};
+const ST=['Ordered','In Production','Dispatched to courier','On Transit','Arrived','Received'],CAT={W:'Women garments',K:'Kids garments',C:'Cosmetics'};
+let db,dl,me=null,tab='',loaded=0,rp={t:'Sales',p:'day',d:new Date().toLocaleDateString('en-CA')};
+const today=()=>S.today||new Date().toLocaleDateString('en-CA');
+const sha=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const shrink=f=>new Promise(r=>{const i=new Image;i.onload=()=>{const c=document.createElement('canvas'),s=Math.min(1,120/Math.max(i.width,i.height));c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.7))};i.src=URL.createObjectURL(f)});
+let timer;const stop=()=>clearInterval(timer),start=()=>{stop();refresh();timer=setInterval(refresh,4000)};
+function out(j){me=null;window._dis=j&&j.error=='disabled';stop();render()}
+async function refresh(){if(!me)return;try{const r=await fetch('/api/state',{credentials:'same-origin'});if(r.status==401)return out(await r.json());Object.assign(S,await r.json());render()}catch(e){}}
+async function api(m,u,b){const r=await fetch('/api'+u,{method:m,headers:{'Content-Type':'application/json'},credentials:'same-origin',body:b?JSON.stringify(b):undefined});let j={};try{j=await r.json()}catch(e){}
+ if(!r.ok){if(r.status==401)out(j);throw new Error(j.error||'Request failed')}refresh();return j}
+const col=k=>({add:async d=>({id:(await api('POST','/c/'+k,d)).id}),doc:id=>({set:d=>api('PUT','/c/'+k+'/'+id,d),update:d=>api('PATCH','/c/'+k+'/'+id,d),delete:()=>api('DELETE','/c/'+k+'/'+id)})});
+const log=a=>me&&me.role=='manager'?api('POST','/audit',{action:a}).catch(()=>{}):0;
+const counted=s=>s.status=='active'||s.status=='requested';
+const sold=o=>o._sold!=null?o._sold:S.sal.filter(s=>s.orderId==o.id&&counted(s)).reduce((a,s)=>a+s.units,0);
+const avail=o=>o.status=='For Sale'?o.qty-sold(o):0;
+const tot=o=>o.qty*o.unitCost+(o.delivery||0);
+const im=s=>s?`<img class="t" src="${s}">`:'';
+
+function form(title,fs,ok,note){
+ $('#m').innerHTML=`<div class="mb"><form class="card" id="f"><h3>${title}</h3>${note?`<p class="m">${note}</p>`:''}${fs.map(f=>`<label>${f.l}${f.t=='select'?`<select name="${f.k}">${f.o.map(o=>Array.isArray(o)?`<option value="${E(o[0])}">${E(o[1])}</option>`:`<option>${E(o)}</option>`).join('')}</select>`:`<input name="${f.k}" type="${f.t||'text'}" ${f.t=='file'?'accept="image/*"':''} value="${E(f.v)}" ${f.min!=null?`min="${f.min}"`:''} ${f.t=='number'?'step="any"':''} ${f.o?'':'required'}>`}</label>`).join('')}<div class="er" id="er"></div><div class="r"><button type="button" onclick="$('#m').innerHTML=''">Cancel</button><button class="p">Save</button></div></form></div>`;
+ $('#f').onsubmit=async e=>{e.preventDefault();const f=e.target,v={};
+  for(const x of fs){const el=f.elements[x.k];v[x.k]=x.t=='file'?(el.files[0]?await shrink(el.files[0]):''):x.t=='number'?parseFloat(el.value):el.value.trim()}
+  try{await ok(v);$('#m').innerHTML=''}catch(x){$('#er').textContent=x.message||x}};
+}
+function say(msg){$('#m').innerHTML=`<div class="mb"><div class="card"><p>${E(msg)}</p><div class="r"><button class="p" onclick="$('#m').innerHTML=''">OK</button></div></div></div>`}
+let _ask;function ask(msg,fn){_ask=fn;$('#m').innerHTML=`<div class="mb"><div class="card"><p>${E(msg)}</p><div class="r"><button onclick="$('#m').innerHTML=''">Cancel</button><button class="p" onclick="$('#m').innerHTML='';Promise.resolve(_ask()).catch(e=>say(e.message))">Confirm</button></div></div></div>`}
+const catSel={k:'cat',l:'Category',t:'select',o:[['W','Women garments (RCW)'],['K','Kids garments (RCK)'],['C','Cosmetics (RCC)']]};
+
+const PAL={Rose:[['#b83a6b','#faf7f5','#e8dfe3'],['#e2679a','#1b1719','#3a3236']],Ocean:[['#1f6fb8','#f2f7fb','#d9e5ef'],['#3d8fdc','#14191d','#2c363d']],Forest:[['#2e7d4f','#f3f8f4','#dbe8de'],['#3ea56d','#141a16','#2b3a30']],Violet:[['#6d4bc4','#f6f4fb','#e2dcf0'],['#8b6fe0','#18161e','#352f45']],Sunset:[['#d2622a','#fbf6f1','#f0e2d4'],['#e07a3f','#1c1713','#3d3228']],Slate:[['#37474f','#f4f6f7','#dde2e5'],['#607d8b','#15181a','#30373b']]};
+let pal='Rose';try{pal=localStorage.getItem('xyzpal')||'Rose'}catch(e){}if(!PAL[pal])pal='Rose';
+function applyPal(){const r=document.documentElement,t=r.dataset.theme,dk=t=='dark'||(t!='light'&&matchMedia('(prefers-color-scheme:dark)').matches),[a,bg,b]=PAL[pal][dk?1:0];
+ r.style.setProperty('--a',a);r.style.setProperty('--bg',bg);r.style.setProperty('--b',b);
+ $('#pal').innerHTML=Object.keys(PAL).map(k=>`<button class="sw" title="${k}" aria-label="${k} theme" style="background:${PAL[k][0][0]};${k==pal?'outline:2px solid var(--t);outline-offset:2px':''}" onclick="setPal('${k}')"></button>`).join('')}
+function setPal(k){pal=k;try{localStorage.setItem('xyzpal',k)}catch(e){}applyPal()}
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',applyPal);
+async function init(){
+ applyPal();dl=1;
+ try{const j=await(await fetch('/api/me',{credentials:'same-origin'})).json();S.setup=j.needsSetup;if(j.user){me=j.user;start()}}catch(e){}
+ render();
+}
+function render(){
+ const a=document.activeElement;if(a&&$('#app').contains(a)&&/INPUT|SELECT/.test(a.tagName))return;
+ if(!me)return login();
+ $('#who').innerHTML=`${E(me.id)} (${me.role}) <button class="s" onclick="logout()">Log out</button>`;
+ const T=me.role=='manager'?['Dashboard','Orders','Stock','Sales','Suppliers','Couriers','Team','Reports','Audit','Data']:['Sell','My sales','Daily report'];
+ if(!T.includes(tab))tab=T[0];
+ $('#nav').innerHTML=T.map(t=>`<button class="${t==tab?'on':''}" onclick="tab='${t}';render()">${t}</button>`).join('');
+ $('#app').innerHTML=V[tab]();
+}
+async function logout(){try{await fetch('/api/logout',{method:'POST',credentials:'same-origin'})}catch(e){}me=null;stop();$('#who').innerHTML='';$('#nav').innerHTML='';render()}
+function login(){
+ $('#nav').innerHTML='';const first=!!S.setup;
+ $('#app').innerHTML=`<form class="card" id="lf" style="max-width:360px;margin:30px auto"><h3>${first?'Set up Manager account':'Sign in'}</h3><label>Username<input name="u" autocomplete="username" required></label><label>Password<input name="p" type="password" autocomplete="current-password" required></label><div class="er" id="le"></div><button class="p">${first?'Create Manager':'Sign in'}</button></form>`;
+ if(window._dis){$('#le').textContent='Your account is disabled. Contact your Manager.';window._dis=0}
+ $('#lf').onsubmit=async e=>{e.preventDefault();const u=e.target.u.value.trim().toLowerCase(),pw=e.target.p.value;
+  try{const r=await fetch('/api/'+(first?'setup':'login'),{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({u,p:pw})}),x=await r.json();if(!r.ok)throw new Error(x.error);me=x.user;S.setup=false;start()}catch(x){$('#le').textContent=x.message}};
+}
+const tbl=(h,rows)=>`<div class="tw"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${h.length}" class="m">Nothing yet.</td></tr>`}</table></div>`;
+const live=()=>S.ord.filter(o=>o.status=='For Sale');
+
+const V={
+Dashboard(){
+ const np=live().filter(o=>!o.price),rq=S.sal.filter(s=>s.status=='requested'),ts=S.sal.filter(s=>s.date==today()&&counted(s)),rv=ts.reduce((a,s)=>a+s.units*s.price,0);
+ const units=live().reduce((a,o)=>a+avail(o),0),val=live().reduce((a,o)=>a+avail(o)*o.unitCost,0);
+ return `${np.map(o=>`<div class="card al">🔔 <b>${E(o.no)}</b> ${E(o.name)} is now For Sale — add a selling price (min ${N(o.unitCost)}). <button class="s p" onclick="setPrice('${o.id}')">Set price</button></div>`).join('')}
+ ${rq.map(s=>`<div class="card al">✏️ ${E(s.user)} requests an edit on sale of ${s.units} × ${E(s.name)} (${s.date}). <button class="s p" onclick="rollback('${s.id}')">Roll back</button></div>`).join('')}
+ <div class="g"><div class="card k"><span>Today's sales (TZS)</span><b>${N(rv)}</b></div><div class="card k"><span>Units sold today</span><b>${N(ts.reduce((a,s)=>a+s.units,0))}</b></div><div class="card k"><span>Units in stock</span><b>${N(units)}</b></div><div class="card k"><span>Stock at cost (TZS)</span><b>${N(val)}</b></div><div class="card k"><span>Open orders</span><b>${S.ord.filter(o=>o.status!='For Sale').length}</b></div></div>
+ <div class="card"><h3>Daily reports submitted</h3>${tbl(['Date','Salesperson','Units','Revenue'],S.rep.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(r=>[r.date,E(r.user),N(r.units),N(r.revenue)]))}</div>`},
+Orders(){
+ return `<div class="row"><button class="p" onclick="newOrder()">+ New order</button><button onclick="oldStock()">+ Add old stock</button></div><div class="card">${tbl(['Order no.','Item','Supplier','Qty','Unit cost','Delivery','Total cost','Status',''],S.ord.filter(o=>!o.old).sort((a,b)=>b.ts-a.ts).map(o=>{const i=ST.indexOf(o.status),nx=ST[i+1];
+  return [E(o.no),im(o.img)+E(o.name),E(o.supSnap||''),N(o.qty),N(o.unitCost),N(o.delivery),N(tot(o)),E(o.status)+(o.courier&&o.status=='On Transit'?` (${E(o.courier)})`:''),nx?`<button class="s" onclick="adv('${o.id}')">→ ${nx}</button>`:'']}))}</div>`},
+Stock(){
+ return `<div class="row"><button onclick="oldStock()">+ Add old stock</button></div><div class="card">${tbl(['Order no.','Item','','Received','Sold','Available','Unit cost','Selling price',''],live().map(o=>[E(o.no),im(o.img)+E(o.name),o.old?'<span class="tag">Old Stock</span>':'',N(o.qty),N(sold(o)),`<b>${N(avail(o))}</b>`,N(o.unitCost),o.price?N(o.price):'<span class="er">not set</span>',`<button class="s" onclick="setPrice('${o.id}')">Price</button>`]))}</div>`},
+Sales(){
+ return `<div class="card">${tbl(['Date','Salesperson','Item','Units','Price','Total','Status',''],S.sal.sort((a,b)=>b.ts-a.ts).slice(0,100).map(s=>[s.date,E(s.user),E(s.no+' '+s.name),N(s.units),N(s.price),N(s.units*s.price),E(s.status),s.status=='requested'?`<button class="s p" onclick="rollback('${s.id}')">Roll back</button>`:'']))}</div>`},
+Suppliers(){
+ return `<div class="row"><button class="p" onclick="newSup()">+ Add supplier</button></div><div class="card">${tbl(['Code','Supplier','WhatsApp'],S.sup.map(s=>[E(s.id),im(s.img)+E(s.name),`<a href="https://wa.me/${E(s.phone.replace(/\D/g,''))}" target="_blank" rel="noopener">${E(s.phone)}</a>`]))}</div>`},
+Couriers(){
+ return `<div class="row"><button class="p" onclick="newCou()">+ Add courier</button></div><div class="card">${tbl(['Courier','Phone'],S.cou.map(c=>[E(c.name),E(c.phone)]))}</div>`},
+Team(){
+ return `<div class="row"><button class="p" onclick="newUser()">+ Register salesperson</button></div><div class="card">${tbl(['Username','Role','Active',''],S.usr.map(u=>[E(u.id),u.role,u.active===false?'No':'Yes',u.role=='sales'?`<button class="s" onclick="toggleUser('${u.id}')">${u.active===false?'Enable':'Disable'}</button> <button class="s" onclick="resetPw('${u.id}')">Reset password</button> <button class="s" style="color:#d33" onclick="delUser('${u.id}')">Delete</button>`:'']))}</div>`},
+Audit(){
+ return `<div class="card">${tbl(['Time','User','Activity'],S.aud.sort((a,b)=>b.ts-a.ts).slice(0,200).map(a=>[new Date(a.ts).toLocaleString(),E(a.user),E(a.action)]))}</div>`},
+Data(){
+ const d=['ord','sal','sup','cou'].reduce((a,k)=>a+S[k].filter(x=>x.demo).length,0),b=['ord','sal','sup','cou','rep','aud'].reduce((a,k)=>a+S[k].length,0);
+ return `<div class="card"><h3>Demo data</h3><p class="m">Adds sample suppliers, a courier, orders in different statuses and a few sales so reviewers can see the system working. ${d?d+' demo records currently loaded.':''}</p><div class="r" style="justify-content:flex-start"><button class="p" onclick="demo()">Load demo data</button><button onclick="rmDemo()" ${d?'':'disabled'}>Remove demo data only</button></div></div>
+ <div class="card"><h3>Clear all business data</h3><p class="m">Deletes every order, stock record, sale, supplier, courier, daily report and audit entry (${b} records). User accounts are kept. Use this before going live.</p><button style="color:#d33" onclick="clearAll()">Clear all data</button></div>`},
+Sell(){
+ const done=S.rep.some(r=>r.id==me.id+'_'+today());
+ return (done?'<div class="card al">Today\'s report is submitted — sales are closed for today.</div>':'')+`<div class="card">${tbl(['Item','Price','Available',''],live().filter(o=>o.price&&avail(o)>0).map(o=>[im(o.img)+E(o.name),N(o.price),N(avail(o)),done?'':`<button class="s p" onclick="sell('${o.id}')">Sell</button>`]))}</div>`},
+'My sales'(){
+ return `<div class="card">${tbl(['Date','Item','Units','Total','Status',''],S.sal.filter(s=>s.user==me.id).sort((a,b)=>b.ts-a.ts).slice(0,60).map(s=>[s.date,E(s.name),N(s.units),N(s.units*s.price),E(s.status),s.status=='active'&&s.date==today()?`<button class="s" onclick="reqEdit('${s.id}')">Request edit</button>`:s.status=='rollback'?`<button class="s p" onclick="resub('${s.id}')">Resubmit</button>`:'']))}</div>`},
+'Daily report'(){
+ const ts=S.sal.filter(s=>s.user==me.id&&s.date==today()&&counted(s)),pend=S.sal.some(s=>s.user==me.id&&s.status=='rollback'),done=S.rep.find(r=>r.id==me.id+'_'+today());
+ const rv=ts.reduce((a,s)=>a+s.units*s.price,0),u=ts.reduce((a,s)=>a+s.units,0);
+ return `<div class="card"><h3>${today()}</h3><div class="g"><div class="k"><span>Sales</span><b>${ts.length}</b></div><div class="k"><span>Units</span><b>${N(u)}</b></div><div class="k"><span>Revenue (TZS)</span><b>${N(rv)}</b></div></div><p>${done?'<span class="ok">✔ Report submitted.</span>':pend?'<span class="er">Resubmit your rolled-back sales first.</span>':`<button class="p" onclick="submitRep(${ts.length},${u},${rv})">Submit daily report</button>`}</p></div>`},
+Reports(){
+ const [a,b]=rg(rp.p,rp.d);let H,R;
+ if(rp.t=='Sales'){const x=S.sal.filter(s=>counted(s)&&s.date>=a&&s.date<=b).sort((p,q)=>p.ts-q.ts);H=['Date','Salesperson','Order no.','Item','Units','Unit price','Total'];R=x.map(s=>[s.date,s.user,s.no,s.name,s.units,s.price,s.units*s.price]);R.push(['TOTAL','','','',x.reduce((p,s)=>p+s.units,0),'',x.reduce((p,s)=>p+s.units*s.price,0)])}
+ else if(rp.t=='Orders'){const x=S.ord.filter(o=>{const d=new Date(o.ts).toLocaleDateString('en-CA');return d>=a&&d<=b});H=['Date','Order no.','Item','Supplier','Qty','Unit cost','Delivery','Total cost','Status','Courier'];R=x.map(o=>[new Date(o.ts).toLocaleDateString('en-CA'),o.no,o.name,o.supSnap||(o.old?'Old Stock':''),o.qty,o.unitCost,o.delivery||0,tot(o),o.status,o.courier||''])}
+ else{H=['Order no.','Item','Old stock','Received','Sold','Available','Unit cost','Selling price','Stock value at cost'];R=live().map(o=>[o.no,o.name,o.old?'Yes':'',o.qty,sold(o),avail(o),o.unitCost,o.price||'',avail(o)*o.unitCost])}
+ window._csv=[H,...R];
+ const sel=(k,o)=>`<select onchange="rp.${k}=this.value;render()">${o.map(x=>`<option ${x==rp[k]?'selected':''}>${x}</option>`)}</select>`;
+ return `<div class="card"><div class="row">${sel('t',['Sales','Orders','Stock'])}${sel('p',['day','week','month','quarter','year'])}<input type="date" value="${rp.d}" onchange="rp.d=this.value;render()">${dl?'<button class="p" onclick="csv()">Download spreadsheet (.csv)</button>':''}</div><p class="m">${rp.t=='Stock'?'Current position':a+' to '+b}</p>${tbl(H,R.map(r=>r.map(c=>typeof c=='number'?N(c):E(c))))}</div>`}
+};
+function rg(p,d){const t=new Date(d+'T00:00'),y=t.getFullYear(),m=t.getMonth();let a,b;
+ if(p=='day')a=b=t;else if(p=='week'){a=new Date(t);a.setDate(t.getDate()-(t.getDay()+6)%7);b=new Date(a);b.setDate(a.getDate()+6)}
+ else if(p=='month'){a=new Date(y,m,1);b=new Date(y,m+1,0)}else if(p=='quarter'){const q=m-m%3;a=new Date(y,q,1);b=new Date(y,q+3,0)}else{a=new Date(y,0,1);b=new Date(y,11,31)}
+ return[a,b].map(x=>x.toLocaleDateString('en-CA'))}
+async function csv(){const s=window._csv.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+ try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+s],{type:'text/csv'}));a.download=`xyz-${rp.t.toLowerCase()}-${rp.p}-${rp.d}.csv`;a.click()}catch(e){}}
+
+// ---- manager actions
+const nextNo=(c,old)=>{const p='RC'+c+(old?'-OLD':'-'),n=S.ord.filter(o=>o.no.startsWith(p)).length+1;return p+String(n).padStart(4,'0')};
+function newOrder(){
+ if(!S.sup.length)return say('Add a supplier first.');
+ form('New order',[catSel,{k:'sup',l:'Supplier',t:'select',o:S.sup.map(s=>[s.id,s.name+' ('+s.id+')'])},{k:'name',l:'Item name'},{k:'img',l:'Item image',t:'file'},{k:'qty',l:'Quantity (units)',t:'number',min:1},{k:'unitCost',l:'Production price per unit (TZS)',t:'number',min:0}],async v=>{
+  const s=S.sup.find(x=>x.id==v.sup),no=nextNo(v.cat);await col('ord').add({no,cat:v.cat,name:v.name,img:v.img,qty:v.qty,unitCost:v.unitCost,supplier:v.sup,supSnap:s.name,delivery:0,status:'Ordered',ts:Date.now()});log('Placed order '+no)})}
+function oldStock(){
+ form('Add old stock',[catSel,{k:'name',l:'Item name'},{k:'img',l:'Item image',t:'file'},{k:'qty',l:'Units currently in stock',t:'number',min:1},{k:'unitCost',l:'Production price per unit (TZS)',t:'number',min:0}],async v=>{
+  const no=nextNo(v.cat,1);await col('ord').add({no,cat:v.cat,name:v.name,img:v.img,qty:v.qty,unitCost:v.unitCost,old:true,supSnap:'Old Stock',delivery:0,status:'For Sale',ts:Date.now()});log('Added old stock '+no)},'Tagged as "Old Stock" — available before this system. Set its selling price afterwards.')}
+function adv(id){
+ const o=S.ord.find(x=>x.id==id),nx=ST[ST.indexOf(o.status)+1];
+ if(nx=='Dispatched to courier'){if(!S.cou.length)return say('Add a courier first.');
+  return form('Dispatch '+o.no,[{k:'c',l:'Courier',t:'select',o:S.cou.map(c=>c.name)},{k:'d',l:'Delivery cost (TZS)',t:'number',min:0,v:o.delivery||0}],async v=>{await col('ord').doc(id).update({status:nx,courier:v.c,delivery:v.d});log(`${o.no} dispatched via ${v.c}, delivery ${v.d}`)})}
+ const real=nx=='Received'?'For Sale':nx;col('ord').doc(id).update({status:real}).then(()=>log(`${o.no} → ${real}`))}
+function setPrice(id){
+ const o=S.ord.find(x=>x.id==id);
+ form('Selling price: '+o.name,[{k:'p',l:'Selling price per unit (TZS)',t:'number',min:o.unitCost,v:o.price||''}],async v=>{if(v.p<o.unitCost)throw 'Price cannot be below production price ('+N(o.unitCost)+').';await col('ord').doc(id).update({price:v.p});log(`Set price ${o.no} = ${v.p}`)},'Minimum: '+N(o.unitCost))}
+function rollback(id){const s=S.sal.find(x=>x.id==id);ask('Roll back this sale for editing? Units return to stock until resubmitted.',()=>col('sal').doc(id).update({status:'rollback'}).then(()=>log('Rolled back sale of '+s.name+' by '+s.user)))}
+function newSup(){form('Add supplier',[{k:'name',l:'Supplier title / name'},{k:'code',l:'Unique supplier code'},{k:'phone',l:'WhatsApp number (with country code)'},{k:'img',l:'Logo / profile image',t:'file'}],async v=>{const id=v.code.toUpperCase().replace(/[^A-Z0-9-]/g,'');if(!id||S.sup.some(s=>s.id==id))throw 'Supplier code must be unique.';await col('sup').doc(id).set({name:v.name,phone:v.phone,img:v.img});log('Added supplier '+id)})}
+function newCou(){form('Add courier',[{k:'name',l:'Courier name'},{k:'phone',l:'Phone'}],async v=>{await col('cou').add(v);log('Added courier '+v.name)})}
+function newUser(){form('Register salesperson',[{k:'u',l:'Username'},{k:'p',l:'Password (min 6 chars)',t:'password'}],async v=>{const u=v.u.toLowerCase().replace(/\s/g,'');if(S.usr.some(x=>x.id==u))throw 'Username taken.';if(v.p.length<6)throw 'Password too short.';await api('POST','/users',{u,p:v.p})})}
+function resetPw(id){form('Reset password: '+id,[{k:'p',l:'New password',t:'password'}],async v=>{if(v.p.length<6)throw 'Too short.';await api('POST','/users/'+id+'/password',{p:v.p})})}
+function delUser(id){ask(`Permanently delete ${id}? They can no longer sign in. Their past sales and audit history are kept.`,()=>api('DELETE','/users/'+id))}
+function toggleUser(id){const u=S.usr.find(x=>x.id==id);api('POST','/users/'+id+'/active',{active:u.active===false})}
+
+// ---- sales actions
+function sell(id){
+ const o=S.ord.find(x=>x.id==id);
+ form('Sell: '+o.name,[{k:'u',l:`Units sold (available ${avail(o)})`,t:'number',min:1}],async v=>{
+  if(!Number.isInteger(v.u)||v.u<1)throw 'Enter whole units.';if(v.u>avail(o))throw 'Only '+avail(o)+' available.';
+  await api('POST','/sell',{orderId:id,units:v.u})},`Price: TZS ${N(o.price)} per unit (set by manager)`)}
+function reqEdit(id){ask('Ask the manager to roll back this sale so you can correct it?',()=>api('POST','/sales/'+id+'/request'))}
+function resub(id){
+ const s=S.sal.find(x=>x.id==id),o=S.ord.find(x=>x.id==s.orderId);
+ form('Resubmit: '+s.name,[{k:'u',l:`Correct units (available ${avail(o)})`,t:'number',min:1,v:s.units}],async v=>{if(!Number.isInteger(v.u)||v.u<1)throw 'Enter whole units.';if(v.u>avail(o))throw 'Only '+avail(o)+' available.';await api('POST','/sales/'+id+'/resubmit',{units:v.u})})}
+function submitRep(n,u,rv){ask(`Submit today's report? ${n} sales, ${u} units, TZS ${N(rv)}. Sales close for today.`,()=>api('POST','/report'))}
+async function wipe(ks,only){for(const k of ks)await Promise.all(S[k].filter(x=>!only||x.demo).map(x=>col(k).doc(x.id).delete()))}
+function demo(){ask('Load sample data (marked as demo) into the system?',async()=>{
+ const t=Date.now(),B={ts:t,demo:true,delivery:0};
+ await col('sup').doc('DEMO-A').set({name:'Guangzhou Fashion Co (demo)',phone:'+8613800000000',img:'',demo:true});
+ await col('cou').add({name:'Demo Cargo Ltd',phone:'+255700000000',demo:true});
+ const o1=await col('ord').add({...B,no:'RCW-9001',cat:'W',name:'Floral Dress (demo)',img:'',qty:40,unitCost:18000,price:32000,supplier:'DEMO-A',supSnap:'Guangzhou Fashion Co (demo)',delivery:120000,courier:'Demo Cargo Ltd',status:'For Sale'});
+ await col('ord').add({...B,no:'RCK-9001',cat:'K',name:'Kids T-Shirt Set (demo)',img:'',qty:60,unitCost:7000,supplier:'DEMO-A',supSnap:'Guangzhou Fashion Co (demo)',delivery:90000,courier:'Demo Cargo Ltd',status:'For Sale'});
+ await col('ord').add({...B,no:'RCC-9001',cat:'C',name:'Lipstick Pack (demo)',img:'',qty:100,unitCost:2500,supplier:'DEMO-A',supSnap:'Guangzhou Fashion Co (demo)',delivery:60000,courier:'Demo Cargo Ltd',status:'On Transit'});
+ await col('ord').add({...B,no:'RCW-9002',cat:'W',name:'Abaya (demo)',img:'',qty:25,unitCost:30000,supplier:'DEMO-A',supSnap:'Guangzhou Fashion Co (demo)',status:'In Production'});
+ for(const u of [5,3])await col('sal').add({orderId:o1.id,no:'RCW-9001',name:'Floral Dress (demo)',units:u,price:32000,user:'demo',date:today(),ts:Date.now(),status:'active',demo:true});
+ log('Loaded demo data')})}
+function rmDemo(){ask('Remove all demo records?',async()=>{await wipe(['sal','ord','sup','cou'],1);log('Removed demo data')})}
+function clearAll(){ask('This permanently deletes ALL orders, stock, sales, suppliers, couriers, reports and audit history. User accounts are kept. Continue?',async()=>{await wipe(['sal','ord','sup','cou','rep','aud']);log('Cleared all business data')})}
+init();
+</script></body></html>
